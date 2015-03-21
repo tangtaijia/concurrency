@@ -19,6 +19,7 @@ class Yielder implements Runnable {
     public void run() {
         for (int i = 0; i < 300; i++) {
             System.out.println(Thread.currentThread() + " 第" + i + "次执行");
+            // 在同步程序块内调用yeild方法让出CPU资源也没有意义，因为你占用着锁，其他互斥线程还是无法访问同步程序块
             if (0 == i % 7)
                 Thread.yield();
         }
