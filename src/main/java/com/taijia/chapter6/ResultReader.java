@@ -2,6 +2,7 @@ package com.taijia.chapter6;
 
 /**
  * 结果读取
+ * 测试 wait notifyAll
  * User: taijia
  * Date: 2015/3/22
  * Time: 14:04
