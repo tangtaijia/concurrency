@@ -1,5 +1,7 @@
 package com.taijia.chapter2;
 
+import com.alibaba.fastjson.JSON;
+
 /**
  * 实现Runnable接口的类
  * User: taijia
@@ -21,7 +23,9 @@ public class TestRunnable implements Runnable {
     }
 
     public static void main(String[] args) {
-        new Thread(new TestRunnable(),"阿三").start();
-        new Thread(new TestRunnable(),"李四").start();
+        new Thread(new TestRunnable(), "阿三").start();
+        new Thread(new TestRunnable(), "李四").start();
+        int[] ia = {1, 2, 3, 4, 5};
+        System.out.println(JSON.toJSONString(ia));
     }
 }
