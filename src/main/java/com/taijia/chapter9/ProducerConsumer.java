@@ -1,5 +1,6 @@
 package com.taijia.chapter9;
 
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -23,7 +24,8 @@ import java.util.concurrent.locks.ReentrantLock;
 public class ProducerConsumer {
     public static void main(String[] args) {
 //        Godown godown = new Godown(); // synchronized wait notify notifyAll
-        Godown godown = new Storage(); // lock condition await signal signalAll
+//        Godown godown = new Storage(); // lock condition await signal signalAll
+        Godown godown = new Warehouse(); // LinkedBlockingQueue
         // 生产线程
         for (int i = 0; i < 16; i++) {
             new Producer(13, godown).start();
@@ -46,7 +48,7 @@ public class ProducerConsumer {
 }
 
 /**
- * 仓库
+ * 仓库--synchronized wait notify notifyAll
  */
 class Godown {
     public static final int MAX_SIZE = 77; // 最大库存量
@@ -113,7 +115,7 @@ class Godown {
 }
 
 /**
- * 仓库
+ * 仓库--lock condition await signal signalAll
  */
 class Storage extends Godown {
     Storage() {
@@ -187,6 +189,58 @@ class Storage extends Godown {
         } else {
             System.out.println("消费者线程："+Thread.currentThread().getName() + " 获取锁失败！");
         }
+    }
+}
+
+/**
+ * 仓库--LinkedBlockingQueue
+ */
+class Warehouse extends Godown {
+    // 仓库存储的载体
+    private LinkedBlockingQueue<Object> list = new LinkedBlockingQueue<Object>(MAX_SIZE);
+
+    /**
+     * 生产
+     * @param num 个数
+     */
+    @Override
+    public void produce(int num) {
+        // 如果库存量满
+        if(MAX_SIZE < list.size()+num) {
+            System.out.println("当前库存为 " + list.size() + ",要生产的产品数量 " + num +
+                    " 超过了最大库存数量" + MAX_SIZE + "，暂时不能自行生产！！");
+        }
+        // 生产条件满足情况下，生产num个产品
+        for (int i = 0; i < num; i++) {
+            try {
+                // 放入产品并自动阻塞
+                list.put(new Object());
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }
+        System.out.println("生产了 " + num + "个产品，现仓储量为 " + list.size());
+    }
+
+    /**
+     * 消费
+     * @param num 个数
+     */
+    @Override
+    public void consume(int num) {
+        // 如果库存量空
+        if(list.size() < num)
+            System.out.println("当前库存为 " + list.size() + ",要消费的产品数量 " + num + " ，暂时不够消费！！");
+        // 消费条件满足情况下，消费num个产品
+        for (int i = 0; i < num; i++) {
+            try {
+                // 消费产品并自动阻塞
+                list.take();
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }
+        System.out.println("消费了 " + num + "个产品，现仓储量为 " + list.size());
     }
 }
 
