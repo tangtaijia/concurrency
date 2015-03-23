@@ -1,5 +1,9 @@
 package com.taijia.chapter9;
 
+import java.util.concurrent.locks.Condition;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
+
 /**
  * 生产者消费者
  * <p/>
@@ -18,9 +22,10 @@ package com.taijia.chapter9;
  */
 public class ProducerConsumer {
     public static void main(String[] args) {
-        Godown godown = new Godown();
+//        Godown godown = new Godown(); // synchronized wait notify notifyAll
+        Godown godown = new Storage(); // lock condition await signal signalAll
         // 生产线程
-        for (int i = 0; i < 15; i++) {
+        for (int i = 0; i < 16; i++) {
             new Producer(13, godown).start();
             try {
                 Thread.sleep(500);
@@ -29,7 +34,7 @@ public class ProducerConsumer {
             }
         }
         // 消费线程
-        for (int i = 0; i < 19; i++) {
+        for (int i = 0; i < 18; i++) {
             new Consumer(12, godown).start();
             try {
                 Thread.sleep(500);
@@ -45,7 +50,7 @@ public class ProducerConsumer {
  */
 class Godown {
     public static final int MAX_SIZE = 77; // 最大库存量
-    private int currnum; // 当前库存量
+    protected int currnum; // 当前库存量
 
     Godown() {
         this.currnum = 0;
@@ -60,22 +65,25 @@ class Godown {
      *
      * @param num 个数
      */
-    public synchronized void produce(int num) {
-        // 查看仓库是否将超过最大库存
-        while ((currnum + num) > MAX_SIZE) {
-            System.out.println("当前库存为 " + currnum + ",要生产的产品数量 " + num +
-                    " 超过了最大库存数量" + MAX_SIZE + "，暂时不能自行生产！！");
-            try {
-                // 当前生产线程等待
-                wait();
-            } catch (InterruptedException e) {
-                e.printStackTrace();
+    public void produce(int num) {
+        synchronized (this) {
+            // 查看仓库是否将超过最大库存
+            while ((currnum + num) > MAX_SIZE) {
+                System.out.println("当前库存为 " + currnum + ",要生产的产品数量 " + num +
+                        " 超过了最大库存数量" + MAX_SIZE + "，暂时不能自行生产！！");
+                try {
+                    // 当前生产线程等待
+                    wait();
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
             }
+            // 生产，这里只是简单的增加当前库存数量
+            currnum += num;
+            System.out.println("生产了 " + num + "个产品，现仓储量为 " + currnum);
+            // 唤醒此对象上所有等待的线程
+            notifyAll();
         }
-        currnum += num;
-        System.out.println("生产了 " + num + "个产品，现仓储量为 " + currnum);
-        // 唤醒此对象上所有等待的线程
-        notifyAll();
     }
 
     /**
@@ -83,22 +91,102 @@ class Godown {
      *
      * @param num 个数
      */
-    public synchronized void consume(int num) {
-        // 测试是否可消费
-        while (num > currnum) {
-            System.out.println("当前库存为 " + currnum + ",要消费的产品数量 " + num + " ，暂时不够消费！！");
-            try {
-                // 当前消费线程等待
-                wait();
-            } catch (InterruptedException e) {
-                e.printStackTrace();
+    public void consume(int num) {
+        synchronized (this) {
+            // 测试是否可消费
+            while (num > currnum) {
+                System.out.println("当前库存为 " + currnum + ",要消费的产品数量 " + num + " ，暂时不够消费！！");
+                try {
+                    // 当前消费线程等待
+                    wait();
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
             }
+            // 消费，这里只是简单的减少当前库存数量
+            currnum -= num;
+            System.out.println("消费了 " + num + "个产品，现仓储量为 " + currnum);
+            // 唤醒此对象上等待的所有线程
+            notifyAll();
         }
-        // 消费，这里只是简单的减少当前库存数量
-        currnum -= num;
-        System.out.println("消费了 " + num + "个产品，现仓储量为 " + currnum);
-        // 唤醒此对象上等待的所有线程
-        notifyAll();
+    }
+}
+
+/**
+ * 仓库
+ */
+class Storage extends Godown {
+    Storage() {
+        super();
+    }
+
+    Storage(int currnum) {
+        super(currnum);
+    }
+    // 锁
+    private final Lock lock = new ReentrantLock(true); // true的话就是公平锁
+    // 仓库满的条件
+    private final Condition full = lock.newCondition();
+    // 仓库空的条件
+    private final Condition empty = lock.newCondition();
+
+    /**
+     * 生产
+     * @param num 个数
+     */
+    @Override
+    public void produce(int num) {
+        // 获得锁
+        if(lock.tryLock()) {
+            // 查看仓库是否将超过最大库存
+            while ((currnum + num) > MAX_SIZE) {
+                System.out.println("当前库存为 " + currnum + ",要生产的产品数量 " + num +
+                        " 超过了最大库存数量" + MAX_SIZE + "，暂时不能自行生产！！");
+                try {
+                    // 当前生产线程等待
+                    full.await();
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }
+            // 生产，这里只是简单的增加当前库存数量
+            currnum += num;
+            System.out.println("生产了 " + num + "个产品，现仓储量为 " + currnum);
+            empty.signalAll(); // 唤醒因仓库空而阻塞的线程
+            // 释放锁
+            lock.unlock();
+        } else {
+            System.out.println("生产者线程：" +Thread.currentThread().getName() + " 获取锁失败！");
+        }
+    }
+
+    /**
+     *
+     * @param num 个数
+     */
+    @Override
+    public void consume(int num) {
+        // 获得锁
+        if(lock.tryLock()) {
+            // 测试是否可消费
+            while (num > currnum) {
+                System.out.println("当前库存为 " + currnum + ",要消费的产品数量 " + num + " ，暂时不够消费！！");
+                try {
+                    // 当前消费线程等待
+                    empty.await();
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }
+            // 消费，这里只是简单的减少当前库存数量
+            currnum -= num;
+            System.out.println("消费了 " + num + "个产品，现仓储量为 " + currnum);
+            full.signalAll(); // 唤醒因仓库满而阻塞的线程
+            // 释放锁
+            lock.unlock();
+        } else {
+            System.out.println("消费者线程："+Thread.currentThread().getName() + " 获取锁失败！");
+        }
     }
 }
 
