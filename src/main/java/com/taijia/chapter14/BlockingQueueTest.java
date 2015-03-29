@@ -7,7 +7,7 @@ import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * 阻塞队列测试.实现生产者消费者
+ * 阻塞队列测试.实现生产者消费者 FIFO
  * User: taijia
  * Date: 2015/3/26
  * Time: 19:36
@@ -31,14 +31,15 @@ public class BlockingQueueTest {
         pool.execute(consumer);
 
         try {
-            // 执行10秒
-            Thread.sleep(10000);
+            // 执行3秒
+            Thread.sleep(3000);
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
         producer1.stop();
         producer2.stop();
         producer3.stop();
+        System.out.println("！！！！！！！！！！所有生产线程停止！！！！！！！！！！");
 
         try {
             Thread.sleep(2000);
@@ -63,28 +64,28 @@ class Consumer implements Runnable {
 
     @Override
     public void run() {
-        System.out.println("线程:" + name + "启动消费者线程！");
+        System.out.println("线程: " + name + "启动消费者线程！");
         Random random = new Random();
         boolean isRunning = true;
-        while (isRunning) {
-            System.out.println("线程:" + name + "正在从对列取数据...");
-            try {
+        try {
+            while (isRunning) {
+                System.out.println("线程: " + name + "正在从对列取数据...");
                 String data = queue.poll(2, TimeUnit.SECONDS);
-                if(!StringUtils.isEmpty(data)) {
-                    System.out.println("线程:" + name + "拿到数据："+data);
-                    System.out.println("线程:" + name + "正在消费数据："+data);
+                if (!StringUtils.isEmpty(data)) {
+                    System.out.println("线程: " + name + "正在消费数据：" + data);
                     Thread.sleep(random.nextInt(DEFAULT_RANGE_FOR_SLEEP));
                 } else {
                     // 超过2秒还没数据，表明生产线程已经退出，自动退出消费线程
                     isRunning = false;
                 }
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-                Thread.currentThread().interrupt();
-            } finally {
-                System.out.println("线程:" + name + "退出消费者线程！");
             }
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+            Thread.currentThread().interrupt();
+        } finally {
+            System.out.println("线程: " + name + "退出消费者线程！");
         }
+
     }
 }
 
@@ -102,24 +103,25 @@ class Producer implements Runnable {
 
     @Override
     public void run() {
-        String data = null;
+        String data;
         Random random = new Random();
-        System.out.println("线程:" + name + "启动生产线程!");
-        while (isRunning) {
-            System.out.println("线程:" + name + "正在生产数据...");
-            try {
+        System.out.println("线程: " + name + "启动生产线程!");
+        try {
+            while (isRunning) {
+                System.out.println("线程: " + name + "正在生产数据...");
                 Thread.sleep(random.nextInt(DEFAULT_RANGE_FOR_SLEEP));
                 data = "data:" + count.incrementAndGet();
-                System.out.println("线程:" + name + "将数据：" + data + "放入队列");
-                if(!queue.offer(data,2,TimeUnit.SECONDS))
-                    System.out.println("线程:" + name + "放入数据："+ data + " 失败");
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-                Thread.currentThread().interrupt();
-            } finally {
-                System.out.println("线程:" + name + "退出生产者线程！");
+                System.out.println("线程: " + name + "将数据：" + data + "放入队列");
+                if (!queue.offer(data, 2, TimeUnit.SECONDS))
+                    System.out.println("线程: " + name + "放入数据：" + data + " 失败");
             }
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+            Thread.currentThread().interrupt();
+        } finally {
+            System.out.println("线程: " + name + "退出生产者线程！");
         }
+
     }
 
     public void stop() {
